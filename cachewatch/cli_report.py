@@ -45,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _print_report(snapshots: List[CacheStats], window: float) -> None:
+    """Print a formatted summary report to stdout.
+
+    Args:
+        snapshots: List of CacheStats snapshots within the reporting window.
+        window: The time window in seconds that the report covers.
+    """
     count = len(snapshots)
     avg = average_hit_ratio(snapshots)
     peak = peak_hit_ratio(snapshots)
@@ -62,16 +68,27 @@ def _print_report(snapshots: List[CacheStats], window: float) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
+    """Execute the report sub-command.
+
+    Collects *args.samples* snapshots from Redis, filters them to the
+    requested time window, and prints a summary report.
+
+    Returns:
+        0 on success, 1 if any collection error occurs.
+    """
     collector = RedisCollector(args.redis_url)
     tracker = StatsTracker()
 
     print(f"Collecting {args.samples} samples from {args.redis_url} …")
-    for _ in range(args.samples):
+    for i in range(args.samples):
         try:
             stats = collector.collect()
             tracker.record(stats)
         except Exception as exc:  # noqa: BLE001
-            print(f"Error collecting stats: {exc}", file=sys.stderr)
+            print(
+                f"Error collecting sample {i + 1}/{args.samples}: {exc}",
+                file=sys.stderr,
+            )
             return 1
 
     snapshots = filter_last_n_seconds(tracker, seconds=args.window)
