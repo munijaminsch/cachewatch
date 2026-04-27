@@ -50,3 +50,24 @@ class StatsTracker:
             return 0.0
         total_delta = (curr.hits + curr.misses) - (prev.hits + prev.misses)
         return max(total_delta, 0) / elapsed
+
+    def peak_requests_per_second(self) -> float:
+        """Return the highest requests/second observed across the entire history.
+
+        Iterates over consecutive snapshot pairs and returns the maximum
+        per-second request rate seen, which is useful for scaling sparkline
+        axes or displaying a peak indicator in the UI.
+        """
+        if len(self._history) < 2:
+            return 0.0
+        peak = 0.0
+        history = list(self._history)
+        for prev, curr in zip(history, history[1:]):
+            elapsed = curr.timestamp - prev.timestamp
+            if elapsed <= 0:
+                continue
+            total_delta = (curr.hits + curr.misses) - (prev.hits + prev.misses)
+            rps = max(total_delta, 0) / elapsed
+            if rps > peak:
+                peak = rps
+        return peak
