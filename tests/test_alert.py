@@ -24,8 +24,14 @@ class TestAlertManager:
         assert mgr.crit_threshold == DEFAULT_CRIT_THRESHOLD
 
     def test_invalid_thresholds_raises(self):
+        """warn_threshold must be greater than crit_threshold."""
         with pytest.raises(ValueError):
             AlertManager(warn_threshold=0.5, crit_threshold=0.6)
+
+    def test_equal_thresholds_raises(self):
+        """Equal warn and crit thresholds should also be invalid."""
+        with pytest.raises(ValueError):
+            AlertManager(warn_threshold=0.5, crit_threshold=0.5)
 
     def test_no_alert_above_warn_threshold(self):
         mgr = AlertManager(warn_threshold=0.7, crit_threshold=0.5)
