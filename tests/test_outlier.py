@@ -19,6 +19,12 @@ def _tracker(*snaps: CacheStats) -> StatsTracker:
     return t
 
 
+def _uniform_tracker(count: int, hits: int, misses: int) -> StatsTracker:
+    """Return a StatsTracker populated with ``count`` identical snapshots."""
+    snaps = [_snap(float(i), hits, misses) for i in range(count)]
+    return _tracker(*snaps)
+
+
 class TestOutlierResult:
     def test_str_contains_ts_and_ratio(self):
         r = OutlierResult(timestamp=1.0, hit_ratio=0.9, mean=0.5, std_dev=0.1, z_score=4.0)
@@ -42,8 +48,7 @@ class TestDetectOutliers:
         assert detect_outliers(t) == []
 
     def test_returns_empty_when_all_identical(self):
-        snaps = [_snap(float(i), 8, 2) for i in range(10)]
-        t = _tracker(*snaps)
+        t = _uniform_tracker(10, hits=8, misses=2)
         assert detect_outliers(t) == []
 
     def test_detects_high_outlier(self):
@@ -79,3 +84,11 @@ class TestDetectOutliers:
         loose = detect_outliers(t, z_threshold=1.0)
         strict = detect_outliers(t, z_threshold=3.5)
         assert len(loose) >= len(strict)
+
+    def test_no_false_positives_with_gradual_increase(self):
+        """Smoothly rising hit ratios should not trigger outlier detection."""
+        # ratios: 0.50, 0.55, 0.60, ..., 0.95 — linear ramp, no sharp spike
+        snaps = [_snap(float(i), 50 + i * 5, 50 - i * 5) for i in range(10)]
+        t = _tracker(*snaps)
+        results = detect_outliers(t, z_threshold=2.0)
+        assert results == []
