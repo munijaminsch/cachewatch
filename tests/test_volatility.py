@@ -79,3 +79,11 @@ class TestComputeVolatility:
         result = compute_volatility(t)
         assert result is not None
         assert result.window == 5
+
+    def test_zero_hits_and_misses_ratio(self):
+        """A snapshot with zero hits and zero misses should yield a ratio of 0.0."""
+        t = _tracker([(0, 0), (10, 0)])
+        result = compute_volatility(t)
+        assert result is not None
+        assert result.min_ratio == pytest.approx(0.0)
+        assert result.max_ratio == pytest.approx(1.0)
