@@ -48,10 +48,56 @@ def correlate_trackers(
     of two trackers.
 
     Snapshots are paired by position (oldest-first). Only the overlapping
-    length is used. Returns ``None`` when fewer than two paired points exist.
+    length is used. Returns ``None`` when fewer than two paired points exist
+    or when either series has zero variance (constant hit ratio).
     """
     snaps_a = tracker_a.history()
     snaps_b = tracker_b.history()
+
+    n = min(len(snaps_a), len(snaps_b))
+    if n < 2:
+        return None
+
+    xs = [s.stats.hit_ratio for s in snaps_a[:n]]
+    ys = [s.stats.hit_ratio for s in snaps_b[:n]]
+
+    mean_x = sum(xs) / n
+    mean_y = sum(ys) / n
+
+    cov = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+    std_x = (sum((x - mean_x) ** 2 for x in xs)) ** 0.5
+    std_y = (sum((y - mean_y) ** 2 for y in ys)) ** 0.5
+
+    if std_x == 0.0 or std_y == 0.0:
+        return None
+
+    r = cov / (std_x * std_y)
+    r = max(-1.0, min(1.0, r))
+
+    return CorrelationResult(pearson_r=r, n=n, interpretation=_interpret(r))
+
+
+def correlate_trackers_windowed(
+    tracker_a: StatsTracker,
+    tracker_b: StatsTracker,
+    window: int,
+) -> Optional[CorrelationResult]:
+    """Like :func:`correlate_trackers` but restricted to the most recent
+    *window* snapshots from each tracker.
+
+    Useful for detecting short-term correlation shifts without being
+    influenced by older historical data.
+
+    Returns ``None`` for the same reasons as :func:`correlate_trackers`.
+    """
+    if window < 2:
+        raise ValueError(f"window must be at least 2, got {window}")
+
+    # Slice each tracker's history to the requested window before delegating.
+    # We temporarily wrap sliced snapshots via a lightweight shim so we can
+    # reuse the existing correlate_trackers logic.
+    snaps_a = tracker_a.history()[-window:]
+    snaps_b = tracker_b.history()[-window:]
 
     n = min(len(snaps_a), len(snaps_b))
     if n < 2:
